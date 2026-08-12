@@ -1,0 +1,16 @@
+---
+- name: Test AI gateway connectivity
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Check AI gateway
+      ansible.builtin.uri:
+        url: "http://192.168.65.3:18080/health"
+        method: GET
+        return_content: true
+      register: gateway_test
+
+    - name: Show result
+      ansible.builtin.debug:
+        var: gateway_test.json

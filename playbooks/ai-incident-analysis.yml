@@ -1,0 +1,62 @@
+---
+- name: AI Incident Analysis
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    ai_gateway_url: "http://192.168.65.3:18080/analyze"
+    ai_model: "qwen3:4b"
+
+    ai_prompt: >-
+      You are an IT operations incident analyst.
+      Analyze the alert and determine whether there is enough information
+      to identify a probable root cause.
+
+      If there is not enough information, return status need_more_data
+      and request additional evidence using only collectors from the
+      allowed_collectors list.
+
+      Request only the minimum additional evidence needed.
+      Do not request every available collector.
+      Prefer 2 to 4 collectors at a time.
+
+      If enough information exists, return status complete.
+      When status is complete, you MUST provide a probable root_cause,
+      confidence between 0 and 1, supporting evidence, and at least
+      2 specific actionable remediation recommendations.
+
+  tasks:
+
+    - name: Define test alert
+      ansible.builtin.set_fact:
+        incident_alert:
+          alertname: PaymentAPIHighErrorRate
+          severity: critical
+          namespace: ecommerce
+          service: payment-api
+          description: HTTP 500 error rate exceeded threshold
+          error_rate: "76%"
+
+    - name: Send incident to AI
+      ansible.builtin.uri:
+        url: "{{ ai_gateway_url }}"
+        method: POST
+        body_format: json
+        return_content: true
+        body:
+          model: "{{ ai_model }}"
+          prompt: "{{ ai_prompt }}"
+          allowed_collectors:
+            - pod_logs
+            - pod_status
+            - kubernetes_events
+            - service_status
+            - endpoints
+            - network_test
+          alert: "{{ incident_alert }}"
+          evidence: {}
+      register: ai_result
+
+    - name: Display AI decision
+      ansible.builtin.debug:
+        var: ai_result.json
