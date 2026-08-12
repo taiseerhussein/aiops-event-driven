@@ -131,11 +131,7 @@
               'TCP connection from payment-api to postgresql:5432 failed with timeout. DNS resolution succeeds. Other network destinations are reachable.'
             })
           }}
-      register: third_ai_result
-
-    - name: Show second AI decision
-      ansible.builtin.debug:
-        var: third_ai_result.json
+      
     # - name: Initialize evidence
     #   ansible.builtin.set_fact:
     #     incident_evidence: {}
