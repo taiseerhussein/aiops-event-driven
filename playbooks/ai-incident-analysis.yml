@@ -117,6 +117,25 @@
     - name: Show second AI decision
       ansible.builtin.debug:
         var: second_ai_result.json
+
+    - name: Simulate network test
+      when:
+        - second_ai_result.json.status == "need_more_data"
+        - "'network_test' in second_ai_result.json.requested_data"
+      ansible.builtin.set_fact:
+        incident_evidence: >-
+          {{
+            incident_evidence |
+            combine({
+              'network_test':
+              'TCP connection from payment-api to postgresql:5432 failed with timeout. DNS resolution succeeds. Other network destinations are reachable.'
+            })
+          }}
+      register: third_ai_result
+
+    - name: Show second AI decision
+      ansible.builtin.debug:
+        var: third_ai_result.json
     # - name: Initialize evidence
     #   ansible.builtin.set_fact:
     #     incident_evidence: {}
