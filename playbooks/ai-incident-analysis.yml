@@ -60,3 +60,130 @@
     - name: Display AI decision
       ansible.builtin.debug:
         var: ai_result.json
+
+    - name: Initialize evidence
+      ansible.builtin.set_fact:
+        incident_evidence: {}
+
+    - name: Simulate pod logs
+      when: "'pod_logs' in ai_result.json.requested_data"
+      ansible.builtin.set_fact:
+        incident_evidence: >-
+          {{
+            incident_evidence |
+            combine({
+              'pod_logs':
+              'ERROR database connection failed:
+              dial tcp postgresql:5432: connection timed out. ERROR unable to process payment because database connection could not be established.'
+            })
+          }}
+
+    - name: Simulate Kubernetes events
+      when: "'kubernetes_events' in ai_result.json.requested_data"
+      ansible.builtin.set_fact:
+        incident_evidence: >-
+          {{
+            incident_evidence |
+            combine({
+              'kubernetes_events':
+              'No abnormal events detected for payment-api pods. payment-api pods are Running and Ready.'
+            })
+          }}
+
+    - name: Show collected evidence
+      ansible.builtin.debug:
+        var: incident_evidence
+
+    - name: Send evidence back to AI
+      ansible.builtin.uri:
+        url: "{{ ai_gateway_url }}"
+        method: POST
+        body_format: json
+        return_content: true
+        body:
+          model: "{{ ai_model }}"
+          prompt: "{{ ai_prompt }}"
+          allowed_collectors:
+            - pod_logs
+            - pod_status
+            - kubernetes_events
+            - service_status
+            - endpoints
+            - network_test
+          alert: "{{ incident_alert }}"
+          evidence: "{{ incident_evidence }}"
+      register: second_ai_result
+
+    - name: Show second AI decision
+      ansible.builtin.debug:
+        var: second_ai_result.json
+    # - name: Initialize evidence
+    #   ansible.builtin.set_fact:
+    #     incident_evidence: {}
+
+    # - name: Collect pod logs
+    #   when: "'pod_logs' in ai_result.json.requested_data"
+    #   kubernetes.core.k8s_log:
+    #     namespace: "{{ incident_alert.namespace }}"
+    #     label_selectors:
+    #       - "app={{ incident_alert.service }}"
+    #     tail_lines: 100
+    #   register: pod_logs_result
+
+    # - name: Add pod logs to evidence
+    #   when:
+    #     - "'pod_logs' in ai_result.json.requested_data"
+    #     - pod_logs_result is defined
+    #   ansible.builtin.set_fact:
+    #     incident_evidence: >-
+    #       {{
+    #         incident_evidence |
+    #         combine({
+    #           'pod_logs': pod_logs_result.log | default(pod_logs_result)
+    #         })
+    #       }}
+
+    # - name: Collect Kubernetes events
+    #   when: "'kubernetes_events' in ai_result.json.requested_data"
+    #   kubernetes.core.k8s_info:
+    #     api_version: v1
+    #     kind: Event
+    #     namespace: "{{ incident_alert.namespace }}"
+    #   register: k8s_events_result
+
+    # - name: Add Kubernetes events to evidence
+    #   when:
+    #     - "'kubernetes_events' in ai_result.json.requested_data"
+    #     - k8s_events_result is defined
+    #   ansible.builtin.set_fact:
+    #     incident_evidence: >-
+    #       {{
+    #         incident_evidence |
+    #         combine({
+    #           'kubernetes_events': k8s_events_result.resources
+    #         })
+    #       }}
+
+    # - name: Send collected evidence back to AI
+    #   ansible.builtin.uri:
+    #     url: "{{ ai_gateway_url }}"
+    #     method: POST
+    #     body_format: json
+    #     return_content: true
+    #     body:
+    #       model: "{{ ai_model }}"
+    #       prompt: "{{ ai_prompt }}"
+    #       allowed_collectors:
+    #         - pod_logs
+    #         - pod_status
+    #         - kubernetes_events
+    #         - service_status
+    #         - endpoints
+    #         - network_test
+    #       alert: "{{ incident_alert }}"
+    #       evidence: "{{ incident_evidence }}"
+    #   register: second_ai_result
+
+    # - name: Display second AI decision
+    #   ansible.builtin.debug:
+    #     var: second_ai_result.json
